@@ -186,55 +186,77 @@ n8n will be set up with Traefik as a reverse proxy for handling HTTPS and routin
 
 ## Step 7: Configure a PostgreSQL Database for n8n
 
-By default, n8n uses a local SQLite database, which is not recommended for production.  
-To ensure stability and scalability, configure a dedicated PostgreSQL database inside Docker Compose.
+Below are required and strongly recommended environment variables when using n8n with Docker-Compose and PostgreSQL in production. These come from the **official n8n docs**. :contentReference[oaicite:0]{index=0}
 
-1. Update your `compose.yaml` file to include a PostgreSQL service:
+| Variable | Default / Example | Purpose / Notes |
+|---|--------------------|------------------|
+| `DB_TYPE` | `postgresdb` | Must be set to `postgresdb` to use PostgreSQL. Default if omitted is `sqlite`. :contentReference[oaicite:1]{index=1} |
+| `DB_POSTGRESDB_DATABASE` | `n8n` | Name of the database in PostgreSQL. :contentReference[oaicite:2]{index=2} |
+| `DB_POSTGRESDB_HOST` | `db` (or container name) | Hostname of PostgreSQL server. Default is `localhost`. :contentReference[oaicite:3]{index=3} |
+| `DB_POSTGRESDB_PORT` | `5432` | Port PostgreSQL listens on. :contentReference[oaicite:4]{index=4} |
+| `DB_POSTGRESDB_USER` | e.g. `n8n_user` | User connecting to the database. Default is `postgres`. :contentReference[oaicite:5]{index=5} |
+| `DB_POSTGRESDB_PASSWORD` | *strong password* | Must be provided (no default). :contentReference[oaicite:6]{index=6} |
+| `DB_POSTGRESDB_SCHEMA` | `public` | Which schema to use. Default is `public`. :contentReference[oaicite:7]{index=7} |
+| `DB_TABLE_PREFIX` | (empty) | Optional prefix to use for all table names. :contentReference[oaicite:8]{index=8} |
+| `DB_POSTGRESDB_SSL_CA`, `DB_POSTGRESDB_SSL_CERT`, `DB_POSTGRESDB_SSL_KEY`, `DB_POSTGRESDB_SSL_REJECT_UNAUTHORIZED` | (undefined / default) | For TLS connections; only needed if you require encrypted or client-certified DB connections. :contentReference[oaicite:9]{index=9} |
+| `GENERIC_TIMEZONE` or `TZ` | e.g. `UTC` or your region’s TZ | Timezone settings; important for scheduling, cron, timestamps, etc. :contentReference[oaicite:10]{index=10} |
+| `N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS` | `true` | Recommended to secure settings files. :contentReference[oaicite:11]{index=11} |
+| `WEBHOOK_URL` | `https://<your-domain>/<path>` | Needed if using reverse proxy / Traefik to set proper webhook forwarding. :contentReference[oaicite:12]{index=12} |
 
-   ```yaml
-   services:
-     db:
-       image: postgres:14
-       restart: always
-       environment:
-         - POSTGRES_USER=n8n
-         - POSTGRES_PASSWORD=your_secure_password
-         - POSTGRES_DB=n8n
-       volumes:
-         - postgres_data:/var/lib/postgresql/data
+> **Note**: You can also use the `_FILE` suffix for many of the above variables to load sensitive values from files instead of hardcoding in your Compose file. :contentReference[oaicite:13]{index=13}
 
-     n8n:
-       image: docker.n8n.io/n8nio/n8n
-       restart: always
-       depends_on:
-         - db
-       ports:
-         - "127.0.0.1:5678:5678"
-       labels:
-         # (Traefik labels here)
-       environment:
-         - DB_TYPE=postgresdb
-         - DB_POSTGRESDB_HOST=db
-         - DB_POSTGRESDB_DATABASE=n8n
-         - DB_POSTGRESDB_USER=n8n
-         - DB_POSTGRESDB_PASSWORD=your_secure_password
-         - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
-         - N8N_HOST=${SUBDOMAIN}.${DOMAIN_NAME}
-         - N8N_PORT=5678
-         - N8N_PROTOCOL=https
-         - NODE_ENV=production
-         - WEBHOOK_URL=https://${SUBDOMAIN}.${DOMAIN_NAME}/
-         - GENERIC_TIMEZONE=${GENERIC_TIMEZONE}
-         - TZ=${GENERIC_TIMEZONE}
-       volumes:
-         - n8n_data:/home/node/.n8n
-         - ./local-files:/files
+---
 
-   volumes:
-     n8n_data:
-     traefik_data:
-     postgres_data:
+## Docker-Compose Snippet with Full Database & Env Vars
 
+Insert this into your runbook (or replace the previous snippet) under the deployment section so that it includes PostgreSQL + all required environment variables.
+
+```yaml
+version: '3.8'
+
+services:
+  db:
+    image: postgres:14
+    restart: always
+    environment:
+      - POSTGRES_USER=n8n_user
+      - POSTGRES_PASSWORD=your_secure_password
+      - POSTGRES_DB=n8n
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    restart: always
+    depends_on:
+      - db
+    ports:
+      - "127.0.0.1:5678:5678"
+    environment:
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=db
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=n8n
+      - DB_POSTGRESDB_USER=n8n_user
+      - DB_POSTGRESDB_PASSWORD=your_secure_password
+      - DB_POSTGRESDB_SCHEMA=public
+      - GENERIC_TIMEZONE=UTC
+      - TZ=UTC
+      - WEBHOOK_URL=https://${SUBDOMAIN}.${DOMAIN_NAME}/
+      - N8N_HOST=${SUBDOMAIN}.${DOMAIN_NAME}
+      - N8N_PROTOCOL=https
+      - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./local-files:/files
+    labels:
+      # (Traefik labels here, e.g. for routing, TLS, etc.)
+
+volumes:
+  n8n_data:
+  postgres_data:
+  traefik_data: 
+```
 
 ## Step 8: Post-Installation and Best Practices
 - **Security**: Use a firewall (e.g., UFW on Ubuntu: `sudo ufw allow 80,443/tcp`). Enable automatic updates.
@@ -243,5 +265,25 @@ To ensure stability and scalability, configure a dedicated PostgreSQL database i
 - **Troubleshooting**: Check logs with `docker compose logs -f`. Ensure ports 80/443 are open and DNS propagates.
 - **Scaling**: For production, consider adding queue mode or external database (refer to n8n docs for advanced configs).
 - **Backup**: Regularly back up the `n8n_data` volume and `.env` file.
+
+## Step X: Backup & Persistence
+
+- Ensure volumes are persisted:  
+  `n8n_data` for workflows, credentials, settings, logs, etc.  
+  `postgres_data` for database content.
+
+- Regular backups:  
+  Example using `tar` (on host machine):
+
+  ```bash
+  docker run --rm \
+    -v n8n_data:/data \
+    -v $(pwd)/backup:/backup busybox \
+    tar cvf /backup/n8n_data_$(date +%F).tar /data
+
+  docker run --rm \
+    -v postgres_data:/data \
+    -v $(pwd)/backup:/backup busybox \
+    tar cvf /backup/postgres_data_$(date +%F).tar /data
 
 This setup follows the official n8n Docker Compose guide. For customizations, consult the full documentation.
