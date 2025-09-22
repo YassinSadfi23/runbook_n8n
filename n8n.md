@@ -6,7 +6,8 @@
 - [Step 4: Install Docker and Docker Compose](#step-4-install-docker-and-docker-compose)
 - [Step 5: Set Up DNS](#step-5-set-up-dns)
 - [Step 6: Configure n8n with Docker Compose](#step-6-configure-n8n-with-docker-compose)
-- [Step 7: Post-Installation and Best Practices](#step-7-post-installation-and-best-practices)
+- [Step 7: Configure a PostgreSQL Database for n8n](#step-7-configure-a-postgresql-database-for-n8n)
+- [Step 8: Post-Installation and Best Practices](#step-8-post-installation-and-best-practices)
 
 # Runbook: How to Install n8n on an ESXi VM
 
@@ -183,7 +184,7 @@ n8n will be set up with Traefik as a reverse proxy for handling HTTPS and routin
    ```
 6. Verify: Access n8n at https://n8n.example.com (replace with your subdomain). It may take a few minutes for SSL certificates to generate.
 
-## Step 6.1: Configure a PostgreSQL Database for n8n
+## Step 7: Configure a PostgreSQL Database for n8n
 
 By default, n8n uses a local SQLite database, which is not recommended for production.  
 To ensure stability and scalability, configure a dedicated PostgreSQL database inside Docker Compose.
@@ -235,7 +236,7 @@ To ensure stability and scalability, configure a dedicated PostgreSQL database i
      postgres_data:
 
 
-## Step 7: Post-Installation and Best Practices
+## Step 8: Post-Installation and Best Practices
 - **Security**: Use a firewall (e.g., UFW on Ubuntu: `sudo ufw allow 80,443/tcp`). Enable automatic updates.
 - **Persistence**: Data is stored in Docker volumes (`n8n_data` for database, `traefik_data` for certificates).
 - **Updates**: Pull latest images and restart: `docker compose pull && docker compose up -d`.
