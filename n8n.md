@@ -183,6 +183,58 @@ n8n will be set up with Traefik as a reverse proxy for handling HTTPS and routin
    ```
 6. Verify: Access n8n at https://n8n.example.com (replace with your subdomain). It may take a few minutes for SSL certificates to generate.
 
+## Step 6.1: Configure a PostgreSQL Database for n8n
+
+By default, n8n uses a local SQLite database, which is not recommended for production.  
+To ensure stability and scalability, configure a dedicated PostgreSQL database inside Docker Compose.
+
+1. Update your `compose.yaml` file to include a PostgreSQL service:
+
+   ```yaml
+   services:
+     db:
+       image: postgres:14
+       restart: always
+       environment:
+         - POSTGRES_USER=n8n
+         - POSTGRES_PASSWORD=your_secure_password
+         - POSTGRES_DB=n8n
+       volumes:
+         - postgres_data:/var/lib/postgresql/data
+
+     n8n:
+       image: docker.n8n.io/n8nio/n8n
+       restart: always
+       depends_on:
+         - db
+       ports:
+         - "127.0.0.1:5678:5678"
+       labels:
+         # (Traefik labels here)
+       environment:
+         - DB_TYPE=postgresdb
+         - DB_POSTGRESDB_HOST=db
+         - DB_POSTGRESDB_DATABASE=n8n
+         - DB_POSTGRESDB_USER=n8n
+         - DB_POSTGRESDB_PASSWORD=your_secure_password
+         - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
+         - N8N_HOST=${SUBDOMAIN}.${DOMAIN_NAME}
+         - N8N_PORT=5678
+         - N8N_PROTOCOL=https
+         - NODE_ENV=production
+         - WEBHOOK_URL=https://${SUBDOMAIN}.${DOMAIN_NAME}/
+         - GENERIC_TIMEZONE=${GENERIC_TIMEZONE}
+         - TZ=${GENERIC_TIMEZONE}
+       volumes:
+         - n8n_data:/home/node/.n8n
+         - ./local-files:/files
+
+   volumes:
+     n8n_data:
+     traefik_data:
+     postgres_data:
+
+
 ## Step 7: Post-Installation and Best Practices
 - **Security**: Use a firewall (e.g., UFW on Ubuntu: `sudo ufw allow 80,443/tcp`). Enable automatic updates.
 - **Persistence**: Data is stored in Docker volumes (`n8n_data` for database, `traefik_data` for certificates).
